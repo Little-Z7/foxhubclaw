@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -32,6 +32,18 @@ def create_token(user: User) -> str:
     return jwt.encode(payload, settings.secret_key, algorithm="HS256")
 
 
+def user_from_access_token(token: str, session: Session) -> User:
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
+        user_id = int(payload["sub"])
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=401, detail="登录已过期") from exc
+    user = session.get(User, user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=403, detail="账号不可用")
+    return user
+
+
 def current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     session: Session = Depends(get_db),
@@ -40,15 +52,21 @@ def current_user(
         return desktop_user(session)
     if creds is None:
         raise HTTPException(status_code=401, detail="请先登录")
-    try:
-        payload = jwt.decode(creds.credentials, settings.secret_key, algorithms=["HS256"])
-        user_id = int(payload["sub"])
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=401, detail="登录已过期") from exc
-    user = session.get(User, user_id)
-    if user is None or not user.is_active:
-        raise HTTPException(status_code=403, detail="账号不可用")
-    return user
+    return user_from_access_token(creds.credentials, session)
+
+
+def current_file_user(
+    creds: HTTPAuthorizationCredentials | None = Depends(bearer),
+    token: str | None = Query(default=None),
+    session: Session = Depends(get_db),
+) -> User:
+    """Report files are opened as normal browser navigations, so they cannot send Authorization."""
+    if settings.mode == "desktop":
+        return desktop_user(session)
+    raw = creds.credentials if creds else token
+    if not raw:
+        raise HTTPException(status_code=401, detail="请先登录")
+    return user_from_access_token(raw, session)
 
 
 def require_admin(user: User = Depends(current_user)) -> User:

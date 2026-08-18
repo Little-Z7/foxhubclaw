@@ -14,6 +14,9 @@ def test_tiktok_posts_unsupported():
     assert platform_supports("tiktok", "post") is False
     assert platform_supports("douyin", "post") is True
     assert platform_supports("kuaishou", "comment") is True
+    assert platform_supports("bilibili", "comment") is True
+    assert platform_supports("weibo", "comment") is True
+    assert platform_supports("weibo", "post") is True
     assert platform_supports("douyin", "comment") is False
 
 

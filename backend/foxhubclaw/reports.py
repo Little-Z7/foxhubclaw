@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -7,6 +9,8 @@ from typing import Any
 from fpdf import FPDF
 from jinja2 import Template
 from openpyxl import Workbook
+
+from foxhubclaw.capabilities import platform_name
 
 HTML_TEMPLATE = Template(
     """
@@ -38,12 +42,12 @@ HTML_TEMPLATE = Template(
     {% endif %}
     <table>
       <thead>
-        <tr><th>Platform</th><th>Kind</th><th>Title</th><th>Author</th><th>Likes</th><th>Time</th></tr>
+        <tr><th>平台</th><th>类型</th><th>标题</th><th>作者</th><th>点赞</th><th>时间</th></tr>
       </thead>
       <tbody>
         {% for item in items %}
         <tr>
-          <td>{{ item.platform }}</td>
+          <td>{{ item.platform_label }}</td>
           <td>{{ item.kind }}</td>
           <td>{% if item.url %}<a href="{{ item.url }}">{{ item.title }}</a>{% else %}{{ item.title }}{% endif %}</td>
           <td>{{ item.author }}</td>
@@ -58,6 +62,61 @@ HTML_TEMPLATE = Template(
 </html>
 """
 )
+
+
+def resolve_cjk_font() -> Path | None:
+    bundled = Path(__file__).resolve().parent / "assets" / "fonts"
+    meipass = Path(getattr(sys, "_MEIPASS", ".")) / "foxhubclaw" / "assets" / "fonts"
+    windir = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts"
+    candidates = [
+        *sorted(bundled.glob("*.ttf")),
+        *sorted(meipass.glob("*.ttf")),
+        windir / "simhei.ttf",
+        windir / "msyh.ttf",
+        windir / "msyh.ttc",
+        windir / "simsun.ttc",
+        windir / "simkai.ttf",
+    ]
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
+def _write_pdf(pdf_path: Path, keyword: str, items: list[dict[str, Any]], failures: list[dict[str, Any]]) -> None:
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_left_margin(15)
+    pdf.set_right_margin(15)
+    font = resolve_cjk_font()
+    if font is not None:
+        pdf.add_font("FoxCJK", fname=str(font))
+        pdf.set_font("FoxCJK", size=14)
+    else:
+        pdf.set_font("Helvetica", size=14)
+
+    def draw(value: str, size: int, height: int) -> None:
+        pdf.set_x(pdf.l_margin)
+        if font is not None:
+            pdf.set_font("FoxCJK", size=size)
+            pdf.multi_cell(0, height, value, new_x="LMARGIN", new_y="NEXT", wrapmode="CHAR")
+            return
+        pdf.set_font("Helvetica", size=size)
+        pdf.multi_cell(
+            0,
+            height,
+            value.encode("latin-1", "replace").decode("latin-1"),
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
+
+    draw(f"FoxHubClaw / {keyword}", 14, 10)
+    draw(f"共 {len(items)} 条 · {len(failures)} 条平台警告", 10, 8)
+    for item in items:
+        name = platform_name(str(item.get("platform") or ""))
+        draw(f"{name} | {item.get('title') or ''}", 10, 6)
+    pdf.output(str(pdf_path))
 
 
 def write_report_files(
@@ -80,7 +139,7 @@ def write_report_files(
     for item in items:
         sheet.append(
             [
-                item.get("platform"),
+                platform_name(str(item.get("platform") or "")),
                 item.get("kind"),
                 item.get("title"),
                 item.get("author"),
@@ -93,36 +152,19 @@ def write_report_files(
         )
     workbook.save(xlsx_path)
 
+    html_items = [
+        {**item, "platform_label": platform_name(str(item.get("platform") or ""))} for item in items
+    ]
     html = HTML_TEMPLATE.render(
         keyword=keyword,
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
-        items=items,
+        items=html_items,
         item_count=len(items),
         failures=failures or [],
         fail_count=len(failures or []),
     )
     html_path.write_text(html, encoding="utf-8")
 
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
-    pdf.set_left_margin(15)
-    pdf.set_right_margin(15)
-    pdf.set_font("Helvetica", size=14)
-    header = f"FoxHubClaw / {keyword}".encode("latin-1", "replace").decode("latin-1")
-    pdf.cell(0, 10, header, new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", size=10)
-    pdf.cell(
-        0,
-        8,
-        f"Rows: {len(items)}  Warnings: {len(failures or [])}",
-        new_x="LMARGIN",
-        new_y="NEXT",
-    )
-    for item in items[:40]:
-        raw = f"{item.get('platform')} | {item.get('title', '')}"
-        line = raw.encode("latin-1", "replace").decode("latin-1")[:90]
-        pdf.cell(0, 6, line, new_x="LMARGIN", new_y="NEXT")
-    pdf.output(str(pdf_path))
+    _write_pdf(pdf_path, keyword, items, failures or [])
 
     return {"xlsx": str(xlsx_path), "html": str(html_path), "pdf": str(pdf_path)}

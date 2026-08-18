@@ -12,6 +12,7 @@ export type Meta = {
   mode: string;
   auth_required: boolean;
   platforms: Platform[];
+  default_prompts: string[];
 };
 
 const tokenKey = "foxhubclaw.token";
@@ -61,11 +62,21 @@ export const api = {
     }),
   me: () => request<{ id: number; username: string; is_admin: boolean }>("/api/me"),
   settings: () =>
-    request<{ api_key_masked: string; has_key: boolean; limit_per_platform: number; comment_depth: number }>(
-      "/api/settings",
-    ),
+    request<{
+      api_key_masked: string;
+      has_key: boolean;
+      limit_per_platform: number;
+      comment_depth: number;
+      prompts: string[];
+    }>("/api/settings"),
   saveSettings: (body: Record<string, unknown>) =>
-    request("/api/settings", { method: "PUT", body: JSON.stringify(body) }),
+    request<{
+      api_key_masked: string;
+      has_key: boolean;
+      limit_per_platform: number;
+      comment_depth: number;
+      prompts: string[];
+    }>("/api/settings", { method: "PUT", body: JSON.stringify(body) }),
   search: (body: { keyword: string; platforms: string[]; kinds: string[] }) =>
     request<{
       run_id: number;
@@ -85,5 +96,31 @@ export const api = {
 };
 
 export function fileUrl(reportId: number, kind: "xlsx" | "html" | "pdf"): string {
-  return `/api/reports/${reportId}/file/${kind}`;
+  const token = getToken();
+  const path = `/api/reports/${reportId}/file/${kind}`;
+  return token ? `${path}?token=${encodeURIComponent(token)}` : path;
+}
+
+export async function downloadReportFile(reportId: number, kind: "xlsx" | "html" | "pdf"): Promise<string> {
+  const response = await fetch(fileUrl(reportId, kind));
+  if (!response.ok) {
+    let detail = response.statusText;
+    try {
+      const body = await response.json();
+      detail = body.detail || detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(typeof detail === "string" ? detail : "下载失败");
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `FoxHubClaw-${reportId}.${kind}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  return link.download;
 }

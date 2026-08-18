@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from foxhubclaw.config import settings
@@ -19,10 +19,21 @@ engine = create_engine(_engine_url(), future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
+def _ensure_columns() -> None:
+    inspector = inspect(engine)
+    if "user_settings" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("user_settings")}
+    if "prompts_json" not in columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE user_settings ADD COLUMN prompts_json TEXT DEFAULT ''"))
+
+
 def init_db() -> None:
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.reports_dir.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(engine)
+    _ensure_columns()
     if settings.mode == "desktop":
         with SessionLocal() as session:
             user = session.scalar(select(User).where(User.username == "desktop"))

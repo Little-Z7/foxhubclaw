@@ -32,6 +32,7 @@ class UserSetting(Base):
     api_key_encrypted: Mapped[str] = mapped_column(Text, default="")
     limit_per_platform: Mapped[int] = mapped_column(Integer, default=20)
     comment_depth: Mapped[int] = mapped_column(Integer, default=3)
+    prompts_json: Mapped[str] = mapped_column(Text, default="")
 
     user: Mapped[User] = relationship(back_populates="setting")
 

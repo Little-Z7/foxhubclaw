@@ -38,6 +38,8 @@ data/
 # Build / publish
 out/
 publish/
+backend/build/
+FoxHubClaw-*.pdf
 *.exe
 !tools/**/*.exe
 

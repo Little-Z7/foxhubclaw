@@ -87,6 +87,14 @@ a {
   line-height: 1;
 }
 
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+}
+
 nav a {
   display: block;
   text-decoration: none;
@@ -186,6 +194,46 @@ th {
 
 .chip.disabled {
   opacity: 0.45;
+}
+
+.prompt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0 8px;
+}
+
+.prompt-head .ghost {
+  padding: 6px 12px;
+}
+
+.prompt-row {
+  margin-bottom: 8px;
+}
+
+button.chip.prompt {
+  cursor: pointer;
+  background: #14100d;
+  color: var(--ink);
+}
+
+button.chip.prompt:hover {
+  border-color: var(--ember);
+}
+
+.prompt-remove {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--ember);
+}
+
+.prompt-edit {
+  align-items: flex-end;
+  margin: 8px 0 12px;
 }
 
 .auth {

@@ -33,18 +33,19 @@ function logout() {
   <div v-else class="shell">
     <aside class="rail">
       <div class="brand">
-        <small>RedFox desk</small>
+        <img class="brand-mark" src="/favicon.ico" alt="" width="40" height="40" />
+        <small>红狐查询台</small>
         <strong>FoxHubClaw</strong>
       </div>
       <nav>
-        <router-link to="/search">Search</router-link>
-        <router-link to="/tasks">Tasks</router-link>
-        <router-link to="/reports">Reports</router-link>
-        <router-link to="/settings">Settings</router-link>
-        <router-link v-if="isAdmin && meta?.auth_required" to="/admin">Admin</router-link>
+        <router-link to="/search">即时查询</router-link>
+        <router-link to="/tasks">定时任务</router-link>
+        <router-link to="/reports">查询报告</router-link>
+        <router-link to="/settings">设置</router-link>
+        <router-link v-if="isAdmin && meta?.auth_required" to="/admin">后台管理</router-link>
       </nav>
-      <p class="hint" style="margin-top: 40px">{{ username || (meta?.mode === "desktop" ? "Desktop" : "") }}</p>
-      <button v-if="meta?.auth_required" class="ghost" style="margin-top: 12px" @click="logout">Sign out</button>
+      <p class="hint" style="margin-top: 40px">{{ username || (meta?.mode === "desktop" ? "桌面版" : "") }}</p>
+      <button v-if="meta?.auth_required" class="ghost" style="margin-top: 12px" @click="logout">退出登录</button>
     </aside>
     <main class="stage">
       <router-view />

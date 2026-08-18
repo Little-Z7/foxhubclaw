@@ -12,3 +12,4 @@ def test_meta_exposes_product_name():
     body = response.json()
     assert body["name"] == "FoxHubClaw"
     assert "platforms" in body
+    assert body["default_prompts"]

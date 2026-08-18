@@ -3,21 +3,48 @@ from __future__ import annotations
 from typing import Any
 
 from foxhubclaw.capabilities import filter_requested
+from foxhubclaw.comments import collect_comments
 from foxhubclaw.normalize import extract_list, normalize_item
 from foxhubclaw.redfox_http import HttpTransport, Transport
 
 POST_PATHS = {
     "douyin": ("/story/api/dyData/searchArticle", lambda keyword, limit: {"keyword": keyword, "offset": 0}),
-    "xiaohongshu": ("/story/api/redBookData/searchArticle", lambda keyword, limit: {"keyword": keyword, "offset": 0}),
+    "xiaohongshu": (
+        "/story/api/xhs/search/search",
+        lambda keyword, limit: {
+            "keyword": keyword,
+            "pageNum": 1,
+            "pageSize": limit,
+            "startDate": "",
+            "endDate": "",
+            "source": "FoxHubClaw",
+        },
+    ),
     "wechat": ("/story/api/gzhData/searchArticle", lambda keyword, limit: {"keyword": keyword, "offset": 0}),
     "bilibili": (
-        "/story/api/bili/data/workSearch",
-        lambda keyword, limit: {"keyword": keyword, "page": "1", "pageSize": limit},
+        "/story/api/bili/search",
+        lambda keyword, limit: {
+            "keyword": keyword,
+            "sortType": "3",
+            "publishTime": "0",
+            "page": 1,
+            "source": "FoxHubClaw",
+        },
     ),
     "toutiao": ("/story/api/toutiao/searchWork", lambda keyword, limit: {"keyword": keyword, "offset": "0"}),
     "kuaishou": (
         "/story/api/ksAllData/searchWork",
         lambda keyword, limit: {"keyword": keyword, "sort": "最多点赞", "page": 1, "size": limit},
+    ),
+    "weibo": (
+        "/story/api/weibo/ability/searchWork",
+        lambda keyword, limit: {
+            "keyword": keyword,
+            "searchType": "1",
+            "page": "1",
+            "extParam": "",
+            "source": "FoxHubClaw",
+        },
     ),
 }
 
@@ -49,6 +76,10 @@ class QueryRunner:
                 batch = self._search_posts(platform, keyword, limit_per_platform)
                 posts_by_platform[platform] = batch
                 items.extend(batch)
+                if not batch:
+                    failures.append(
+                        {"platform": platform, "kind": kind, "message": "接口成功但未解析到结果"}
+                    )
             except Exception as exc:  # noqa: BLE001
                 failures.append({"platform": platform, "kind": kind, "message": str(exc)})
 
@@ -81,22 +112,6 @@ class QueryRunner:
         posts: list[dict[str, Any]],
         comment_depth: int,
     ) -> list[dict[str, Any]]:
-        if platform != "kuaishou":
-            raise RuntimeError("该平台暂无评论检索")
         if not posts:
             posts = self._search_posts(platform, keyword, max(comment_depth, 1))
-        comments: list[dict[str, Any]] = []
-        for post in posts[:comment_depth]:
-            work_id = str((post.get("extra") or {}).get("work_id") or "")
-            if not work_id:
-                continue
-            payload = self.transport.post_json(
-                "/story/api/ks/ability/commentList",
-                {"opusId": work_id, "cursor": "", "source": "FoxHubClaw"},
-            )
-            for raw in extract_list(payload):
-                item = normalize_item(platform, "comment", raw)
-                if item["url"] == "":
-                    item["url"] = post.get("url") or ""
-                comments.append(item)
-        return comments
+        return collect_comments(self.transport, platform, posts, comment_depth)

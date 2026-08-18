@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from foxhubclaw.config import settings
 from foxhubclaw.crypto import decrypt_secret, encrypt_secret, mask_key
 from foxhubclaw.models import JobRun, QueryJob, Report, User, UserSetting
+from foxhubclaw.prompts import DEFAULT_PROMPTS, normalize_prompts
 from foxhubclaw.query_runner import QueryRunner
 from foxhubclaw.reports import write_report_files
 
@@ -36,6 +37,20 @@ def load_api_key(session: Session, user: User) -> str:
     if not setting.api_key_encrypted:
         return ""
     return decrypt_secret(setting.api_key_encrypted, settings.secret_key)
+
+
+def load_prompts(session: Session, user: User) -> list[str]:
+    setting = get_or_create_setting(session, user)
+    stored = load_list(setting.prompts_json) if setting.prompts_json else []
+    return stored or list(DEFAULT_PROMPTS)
+
+
+def save_prompts(session: Session, user: User, values: list[str]) -> list[str]:
+    setting = get_or_create_setting(session, user)
+    cleaned = normalize_prompts(values)
+    setting.prompts_json = dump_list(cleaned)
+    session.commit()
+    return cleaned
 
 
 def execute_query(

@@ -10,7 +10,22 @@ def extract_list(payload: Any) -> list[dict[str, Any]]:
         return [item for item in payload if isinstance(item, dict)]
     if not isinstance(payload, dict):
         return []
-    for key in ("list", "articles", "comments", "items", "records", "data"):
+    for key in (
+        "list",
+        "articles",
+        "comments",
+        "commentList",
+        "items",
+        "records",
+        "opusInfoList",
+        "workList",
+        "noteList",
+        "articleList",
+        "notes",
+        "works",
+        "videos",
+        "data",
+    ):
         value = payload.get(key)
         if isinstance(value, list):
             return [item for item in value if isinstance(item, dict)]
@@ -59,9 +74,11 @@ def normalize_item(platform: str, kind: str, item: dict[str, Any]) -> dict[str, 
         _first(
             item,
             "userName",
+            "accountName",
+            "authorNickname",
             "author",
-            "nickname",
             "authorName",
+            "nickname",
             "name",
             "upName",
             default="",
@@ -72,7 +89,10 @@ def normalize_item(platform: str, kind: str, item: dict[str, Any]) -> dict[str, 
             item,
             "url",
             "workUrl",
+            "opusUrl",
+            "shareInfoLink",
             "shareUrl",
+            "sourceUrl",
             "link",
             "videoUrl",
             default="",
@@ -97,11 +117,11 @@ def normalize_item(platform: str, kind: str, item: dict[str, Any]) -> dict[str, 
         "author": author,
         "url": url,
         "published_at": published,
-        "likes": _as_int(_first(item, "likeCount", "like_count", "likeNum", "diggCount", default=0)),
-        "comments": _as_int(_first(item, "commentCount", "comment_count", "replyNum", default=0)),
-        "shares": _as_int(_first(item, "shareCount", "share_count", "forwardCount", default=0)),
+        "likes": _as_int(_first(item, "likeCount", "likedCount", "like_count", "likeNum", "commentLikeNum", "diggCount", default=0)),
+        "comments": _as_int(_first(item, "commentCount", "commentsCount", "comment_count", "commentNum", "replyNum", default=0)),
+        "shares": _as_int(_first(item, "shareCount", "sharedCount", "share_count", "forwardCount", "forwardNum", default=0)),
         "extra": {
-            "work_id": _first(item, "workId", "photoId", "opusId", "awemeId", "bvid", "cid"),
+            "work_id": _first(item, "workId", "photoId", "opusId", "awemeId", "bvid", "bvId", "workUuid", "mid", "cid", "id"),
             "cover": _first(item, "coverUrl", "cover", "userHeadUrl"),
         },
     }

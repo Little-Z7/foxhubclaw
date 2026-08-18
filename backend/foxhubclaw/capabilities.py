@@ -35,8 +35,8 @@ CATALOG: list[dict[str, object]] = [
         "name": "B站",
         "name_en": "Bilibili",
         "post": True,
-        "comment": False,
-        "comment_note": "暂无关键词评论接口",
+        "comment": True,
+        "comment_note": "先搜作品，再拉取热门作品评论",
     },
     {
         "id": "toutiao",
@@ -66,15 +66,22 @@ CATALOG: list[dict[str, object]] = [
         "id": "weibo",
         "name": "微博",
         "name_en": "Weibo",
-        "post": False,
-        "comment": False,
-        "comment_note": "公开 Skill 已下线，待接口恢复",
+        "post": True,
+        "comment": True,
+        "comment_note": "先搜博文，再拉取热门博文评论",
     },
 ]
 
 
 def list_platforms() -> list[dict[str, object]]:
     return [dict(item) for item in CATALOG]
+
+
+def platform_name(platform_id: str) -> str:
+    for item in CATALOG:
+        if item["id"] == platform_id:
+            return str(item["name"])
+    return platform_id
 
 
 def platform_supports(platform_id: str, kind: Kind) -> bool:

@@ -9,9 +9,12 @@ class Transport(Protocol):
     def post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         ...
 
+    def post_form(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        ...
+
 
 class HttpTransport:
-    def __init__(self, api_key: str, base_url: str = "https://redfox.hk", timeout: float = 30.0):
+    def __init__(self, api_key: str, base_url: str = "https://redfox.hk", timeout: float = 45.0):
         self.client = httpx.Client(
             base_url=base_url.rstrip("/"),
             timeout=timeout,
@@ -24,7 +27,18 @@ class HttpTransport:
         )
 
     def post_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        response = self.client.post(path, json=payload)
+        return self._unwrap(self.client.post(path, json=payload))
+
+    def post_form(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._unwrap(
+            self.client.post(
+                path,
+                data=payload,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+        )
+
+    def _unwrap(self, response: httpx.Response) -> dict[str, Any]:
         if response.status_code == 401:
             raise RuntimeError("RedFox Key 无效或已失效")
         if response.status_code == 429:

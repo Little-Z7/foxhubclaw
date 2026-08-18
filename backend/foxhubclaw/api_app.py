@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from foxhubclaw.auth import (
     create_token,
+    current_file_user,
     current_user,
     find_user,
     hash_password,
@@ -19,6 +20,7 @@ from foxhubclaw.auth import (
     verify_password,
 )
 from foxhubclaw.capabilities import list_platforms
+from foxhubclaw.prompts import DEFAULT_PROMPTS
 from foxhubclaw.config import settings
 from foxhubclaw.crypto import mask_key
 from foxhubclaw.db import get_db, init_db
@@ -31,8 +33,10 @@ from foxhubclaw.services import (
     get_or_create_setting,
     load_api_key,
     load_list,
+    load_prompts,
     next_run_time,
     save_api_key,
+    save_prompts,
 )
 
 app = FastAPI(title="FoxHubClaw", version="0.1.0")
@@ -60,6 +64,7 @@ class SettingsIn(BaseModel):
     api_key: str | None = None
     limit_per_platform: int | None = Field(default=None, ge=1, le=100)
     comment_depth: int | None = Field(default=None, ge=1, le=10)
+    prompts: list[str] | None = None
 
 
 class QueryIn(BaseModel):
@@ -93,6 +98,7 @@ def meta():
         "mode": settings.mode,
         "auth_required": settings.auth_required,
         "platforms": list_platforms(),
+        "default_prompts": DEFAULT_PROMPTS,
     }
 
 
@@ -140,6 +146,7 @@ def read_settings(user: User = Depends(current_user), session: Session = Depends
         "has_key": bool(key),
         "limit_per_platform": setting.limit_per_platform,
         "comment_depth": setting.comment_depth,
+        "prompts": load_prompts(session, user),
     }
 
 
@@ -153,6 +160,8 @@ def update_settings(body: SettingsIn, user: User = Depends(current_user), sessio
         setting.limit_per_platform = body.limit_per_platform
     if body.comment_depth is not None:
         setting.comment_depth = body.comment_depth
+    if body.prompts is not None:
+        save_prompts(session, user, body.prompts)
     session.commit()
     key = load_api_key(session, user)
     return {
@@ -160,6 +169,7 @@ def update_settings(body: SettingsIn, user: User = Depends(current_user), sessio
         "has_key": bool(key),
         "limit_per_platform": setting.limit_per_platform,
         "comment_depth": setting.comment_depth,
+        "prompts": load_prompts(session, user),
     }
 
 
@@ -252,7 +262,7 @@ def list_reports(user: User = Depends(current_user), session: Session = Depends(
 
 
 @app.get("/api/reports/{report_id}/file/{kind}")
-def download_report(report_id: int, kind: str, user: User = Depends(current_user), session: Session = Depends(get_db)):
+def download_report(report_id: int, kind: str, user: User = Depends(current_file_user), session: Session = Depends(get_db)):
     report = session.get(Report, report_id)
     if report is None or report.user_id != user.id:
         raise HTTPException(status_code=404, detail="报告不存在")
@@ -264,7 +274,12 @@ def download_report(report_id: int, kind: str, user: User = Depends(current_user
         "html": "text/html",
         "pdf": "application/pdf",
     }[kind]
-    return FileResponse(path, media_type=media, filename=Path(path).name)
+    return FileResponse(
+        path,
+        media_type=media,
+        filename=f"FoxHubClaw-{report_id}.{kind}",
+        content_disposition_type="attachment",
+    )
 
 
 @app.get("/api/admin/users")
