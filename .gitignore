@@ -31,6 +31,10 @@ obj/
 *.suo
 *.userosscache
 
+# App data
+backend/data/
+data/
+
 # Build / publish
 out/
 publish/
